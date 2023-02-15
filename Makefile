@@ -17,7 +17,7 @@ release: README.md zip
 	git add Makefile
 	git commit -am "Release $(VERSION)" || true
 	git push
-	hub release create $(VERSION) -m "$(VERSION)" -a release/$(APP)_$(VERSION)_osx_x86_64.tar.gz -a release/$(APP)_$(VERSION)_windows_x86_64.zip -a release/$(APP)_$(VERSION)_linux_x86_64.tar.gz -a release/$(APP)_$(VERSION)_windows_x86_32.zip -a release/$(APP)_$(VERSION)_linux_x86_32.tar.gz -a release/$(APP)_$(VERSION)_linux_arm64.tar.gz
+	hub release create $(VERSION) -m "$(VERSION)" -a release/$(APP)_$(VERSION)_darwin_amd64.tar.gz -a release/$(APP)_$(VERSION)_windows_amd64.zip -a release/$(APP)_$(VERSION)_linux_amd64.tar.gz -a release/$(APP)_$(VERSION)_windows_x86_32.zip -a release/$(APP)_$(VERSION)_linux_x86_32.tar.gz -a release/$(APP)_$(VERSION)_linux_arm64.tar.gz
 
 README.md:
 	go get github.com/keilerkonzept/$(APP) && <README.template.md subst \
@@ -30,48 +30,51 @@ README.md:
 		EXAMPLE_1="$$($(APP) examples/Dockerfile.1 | jq .)" \
 		VERSION="$(VERSION)" APP="$(APP)" USAGE="$$($(APP) -h 2>&1)" > README.md
 
-zip: release/$(APP)_$(VERSION)_osx_x86_64.tar.gz release/$(APP)_$(VERSION)_windows_x86_64.zip release/$(APP)_$(VERSION)_linux_x86_64.tar.gz release/$(APP)_$(VERSION)_windows_x86_32.zip release/$(APP)_$(VERSION)_linux_x86_32.tar.gz release/$(APP)_$(VERSION)_linux_arm64.tar.gz
+zip: release/$(APP)_$(VERSION)_darwin_amd64.tar.gz release/$(APP)_$(VERSION)_windows_amd64.zip release/$(APP)_$(VERSION)_linux_amd64.tar.gz release/$(APP)_$(VERSION)_windows_x86_32.zip release/$(APP)_$(VERSION)_linux_x86_32.tar.gz release/$(APP)_$(VERSION)_linux_arm64.tar.gz
 
-binaries: binaries/osx_x86_64/$(APP) binaries/windows_x86_64/$(APP).exe binaries/linux_x86_64/$(APP) binaries/windows_x86_32/$(APP).exe binaries/linux_x86_32/$(APP)
+binaries: binaries/darwin_amd64/$(APP) binaries/windows_amd64/$(APP).exe binaries/linux_amd64/$(APP) binaries/windows_x86_32/$(APP).exe binaries/linux_x86_32/$(APP)
 
-release/$(APP)_$(VERSION)_osx_x86_64.tar.gz: binaries/osx_x86_64/$(APP)
+release/$(APP)_$(VERSION)_darwin_amd64.tar.gz: binaries/darwin_amd64/$(APP)
 	mkdir -p release
-	tar cfz release/$(APP)_$(VERSION)_osx_x86_64.tar.gz -C binaries/osx_x86_64 $(APP)
+	tar cfz release/$(APP)_$(VERSION)_darwin_amd64.tar.gz -C binaries/darwin_amd64 $(APP)
 
-binaries/osx_x86_64/$(APP): $(GOFILES)
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o binaries/osx_x86_64/$(APP) .
+binaries/darwin_amd64/$(APP): $(GOFILES)
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/darwin_amd64/$(APP) .
 
-release/$(APP)_$(VERSION)_windows_x86_64.zip: binaries/windows_x86_64/$(APP).exe
+binaries/darwin_arm64/$(APP): $(GOFILES)
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/darwin_arm64/$(APP) .
+
+release/$(APP)_$(VERSION)_windows_amd64.zip: binaries/windows_amd64/$(APP).exe
 	mkdir -p release
-	cd ./binaries/windows_x86_64 && zip -r -D ../../release/$(APP)_$(VERSION)_windows_x86_64.zip $(APP).exe
+	cd ./binaries/windows_amd64 && zip -r -D ../../release/$(APP)_$(VERSION)_windows_amd64.zip $(APP).exe
 
-binaries/windows_x86_64/$(APP).exe: $(GOFILES)
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o binaries/windows_x86_64/$(APP).exe .
+binaries/windows_amd64/$(APP).exe: $(GOFILES)
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/windows_amd64/$(APP).exe .
 
-release/$(APP)_$(VERSION)_linux_x86_64.tar.gz: binaries/linux_x86_64/$(APP)
+release/$(APP)_$(VERSION)_linux_amd64.tar.gz: binaries/linux_amd64/$(APP)
 	mkdir -p release
-	tar cfz release/$(APP)_$(VERSION)_linux_x86_64.tar.gz -C binaries/linux_x86_64 $(APP)
+	tar cfz release/$(APP)_$(VERSION)_linux_amd64.tar.gz -C binaries/linux_amd64 $(APP)
 
-binaries/linux_x86_64/$(APP): $(GOFILES)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o binaries/linux_x86_64/$(APP) .
+binaries/linux_amd64/$(APP): $(GOFILES)
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/linux_amd64/$(APP) .
 
 release/$(APP)_$(VERSION)_windows_x86_32.zip: binaries/windows_x86_32/$(APP).exe
 	mkdir -p release
 	cd ./binaries/windows_x86_32 && zip -r -D ../../release/$(APP)_$(VERSION)_windows_x86_32.zip $(APP).exe
 
 binaries/windows_x86_32/$(APP).exe: $(GOFILES)
-	GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o binaries/windows_x86_32/$(APP).exe .
+	GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/windows_x86_32/$(APP).exe .
 
 release/$(APP)_$(VERSION)_linux_x86_32.tar.gz: binaries/linux_x86_32/$(APP)
 	mkdir -p release
 	tar cfz release/$(APP)_$(VERSION)_linux_x86_32.tar.gz -C binaries/linux_x86_32 $(APP)
 
 binaries/linux_x86_32/$(APP): $(GOFILES)
-	GOOS=linux GOARCH=386 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o binaries/linux_x86_32/$(APP) .
+	GOOS=linux GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/linux_x86_32/$(APP) .
 
 release/$(APP)_$(VERSION)_linux_arm64.tar.gz: binaries/linux_arm64/$(APP)
 	mkdir -p release
 	tar cfz release/$(APP)_$(VERSION)_linux_arm64.tar.gz -C binaries/linux_arm64 $(APP)
 
 binaries/linux_arm64/$(APP): $(GOFILES)
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=$(VERSION)" -o binaries/linux_arm64/$(APP) .
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/linux_arm64/$(APP) .
