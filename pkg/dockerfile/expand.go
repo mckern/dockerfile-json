@@ -24,6 +24,7 @@ func (d *Dockerfile) expand(env instructions.SingleWordExpander) {
 			}
 			return value
 		})
+
 		for i := range stage.Commands {
 			cmdExpander, ok := stage.Commands[i].Command.(instructions.SupportsSingleWordExpansion)
 			if ok {
@@ -36,21 +37,25 @@ func (d *Dockerfile) expand(env instructions.SingleWordExpander) {
 func (d *Dockerfile) metaArgsEnvExpander(env instructions.SingleWordExpander) instructions.SingleWordExpander {
 	metaArgsEnv := make(map[string]string, len(d.MetaArgs))
 	for _, arg := range d.MetaArgs {
-		if defaultValue := arg.DefaultValue; defaultValue != nil {
-			metaArgsEnv[arg.Key] = *defaultValue
+		if arg.DefaultValue != nil {
+			metaArgsEnv[arg.Key] = *arg.DefaultValue
 		}
+
 		if value, err := env(arg.Key); err == nil {
 			arg.ProvidedValue = &value
 			metaArgsEnv[arg.Key] = value
 			arg.Value = &value
 		}
+
 		err := arg.Expand(env)
 		if err != nil {
 			continue
 		}
+
+		// process any key-value pairs in a given arg
 		for _, kv := range arg.ArgCommand.Args {
 			if kv.Value != nil {
-				metaArgsEnv[arg.Key] = *kv.Value
+				metaArgsEnv[arg.Key] = kv.ValueString()
 			}
 		}
 	}

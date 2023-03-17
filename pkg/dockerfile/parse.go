@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -28,19 +29,25 @@ func ParseReader(r io.Reader) (*Dockerfile, error) {
 		return nil, fmt.Errorf("dockerfile/instructions.Parse %v", err)
 	}
 	var out Dockerfile
+
+	// process metaArgs, which come before any given stage
 	for _, metaArg := range metaArgs {
 		for _, kv := range metaArg.Args {
 			metaArgOut := &MetaArg{ArgCommand: metaArg}
 			metaArgOut.Key = kv.Key
 			if defaultValue := kv.Value; defaultValue != nil {
 				{
-					defaultValueCopy := *defaultValue
+					defaultValueCopy, err := strconv.Unquote(*defaultValue)
+					if err != nil {
+						defaultValueCopy = *defaultValue
+					}
 					metaArgOut.DefaultValue = &defaultValueCopy
 				}
 			}
 			out.MetaArgs = append(out.MetaArgs, metaArgOut)
 		}
 	}
+
 	for _, stage := range stages {
 		outStage := &Stage{Stage: stage}
 		for _, command := range stage.Commands {
