@@ -11,17 +11,13 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/keilerkonzept/dockerfile-json/pkg/dockerfile"
-	"github.com/yalp/jsonpath"
 )
 
 var config struct {
-	Quiet          bool
-	Expand         bool
-	JSONPathString string
-	JSONPath       jsonpath.FilterFunc
-	JSONPathRaw    bool
-	BuildArgs      AssignmentsMap
-	NonzeroExit    bool
+	Quiet       bool
+	Expand      bool
+	BuildArgs   AssignmentsMap
+	NonzeroExit bool
 }
 
 var name = "dockerfile-json"
@@ -36,8 +32,6 @@ func init() {
 	config.Expand = true
 	flag.BoolVar(&config.Quiet, "quiet", config.Quiet, "suppress log output (stderr)")
 	flag.BoolVar(&config.Expand, "expand-build-args", config.Expand, "expand build args")
-	flag.StringVar(&config.JSONPathString, "jsonpath", config.JSONPathString, "select parts of the output using JSONPath (https://goessner.net/articles/JsonPath)")
-	flag.BoolVar(&config.JSONPathRaw, "jsonpath-raw", config.JSONPathRaw, "when using JSONPath, output raw strings, not JSON values")
 	flag.Var(&config.BuildArgs, "build-arg", config.BuildArgs.Help())
 	flag.Parse()
 
@@ -47,17 +41,6 @@ func init() {
 
 	if flag.NArg() == 0 {
 		flag.Usage()
-	}
-
-	if jsonPathString := config.JSONPathString; jsonPathString != "" {
-		if jsonPathString[0] != '$' {
-			jsonPathString = "$" + jsonPathString
-		}
-		jsonPath, err := jsonpath.Prepare(jsonPathString)
-		if err != nil {
-			log.Fatalf("parse jsonpath %s: %v", jsonPathString, err)
-		}
-		config.JSONPath = jsonPath
 	}
 }
 
@@ -97,50 +80,11 @@ func main() {
 			dockerfile.Expand(env)
 		}
 	}
-	switch {
-	case config.JSONPath != nil:
-		for _, dockerfile := range dockerfiles {
-			rawJSON, err := json.Marshal(dockerfile)
-			if err != nil {
-				log.Printf("error: evaluate jsonpath: %v", err)
-				config.NonzeroExit = true
-				continue
-			}
-			var data map[string]interface{}
-			if err := json.Unmarshal(rawJSON, &data); err != nil {
-				log.Printf("error: evaluate jsonpath: %v", err)
-				config.NonzeroExit = true
-				continue
-			}
-			result, err := config.JSONPath(data)
-			if err != nil {
-				log.Printf("error: evaluate jsonpath: %v", err)
-				config.NonzeroExit = true
-				continue
-			}
-			values, isArray := result.([]interface{})
-			value, isString := result.(string)
-			switch {
-			case isString && config.JSONPathRaw:
-				fmt.Println(value)
-			case isArray && config.JSONPathRaw:
-				for _, value := range values {
-					fmt.Println(value)
-				}
-			case isArray && !config.JSONPathRaw:
-				for _, value := range values {
-					jsonOut.Encode(value)
-				}
-			default:
-				jsonOut.Encode(result)
-			}
 
-		}
-	default:
-		for _, dockerfile := range dockerfiles {
-			jsonOut.Encode(dockerfile)
-		}
+	for _, dockerfile := range dockerfiles {
+		jsonOut.Encode(dockerfile)
 	}
+
 	if config.NonzeroExit {
 		os.Exit(1)
 	}
