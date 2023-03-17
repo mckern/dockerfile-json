@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+
+	flag "github.com/spf13/pflag"
 
 	"github.com/keilerkonzept/dockerfile-json/pkg/dockerfile"
 	"github.com/yalp/jsonpath"
@@ -61,8 +62,8 @@ func init() {
 }
 
 func buildArgEnvExpander() dockerfile.SingleWordExpander {
-	env := make(map[string]string, len(config.BuildArgs.Values))
-	for key, value := range config.BuildArgs.Values {
+	env := make(map[string]string, len(config.BuildArgs.Value))
+	for key, value := range config.BuildArgs.Value {
 		if value != nil {
 			env[key] = *value
 			continue

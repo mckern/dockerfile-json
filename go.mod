@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/moby/buildkit v0.11.4
+	github.com/spf13/pflag v1.0.5
 	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
 )
 
