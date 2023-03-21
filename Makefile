@@ -21,7 +21,7 @@ BIN_NAME := $(BUILD_DIR)/$(BUILD_NAME)
 ARCHIVE_EXT := txz
 ARCHIVE_FLAGS := cJvf
 
-ARCHIVE_NAME := $(BUILD_NAME)-$(VERSION).$(ARCHIVE_EXT)
+ARCHIVE_NAME ?= $(BUILD_NAME)-$(VERSION).$(ARCHIVE_EXT)
 ARCHIVE_TARGET ?=  $(BUILD_DIR)/$(ARCHIVE_NAME)
 
 # ensure that compilation doesn't link against libc

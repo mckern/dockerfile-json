@@ -1,13 +1,9 @@
-name: Build
-run-name: Build `dockerfile-json`
+name: Build & Release
+run-name: Build & release `dockerfile-json`
 on:
-  push:
-    branches:
-      - "**"
-    tags-ignore:
-      - "**"
-  pull_request:
-
+  create:
+    tags:
+      - v*
 jobs:
   build:
     strategy:
@@ -31,26 +27,27 @@ jobs:
         env:
           GOOS: "${{matrix.os}}"
           GOARCH: "${{matrix.arch}}"
-          ARCHIVE_NAME: dockerfile-json_${{github.ref_name}}_${{matrix.os}}_${{matrix.arch}}.txz
         run: make compress
 
       - name: Upload compiled archives
         uses: actions/upload-artifact@v3
         with:
-          path: ./build/*.txz
+          name: release
+          path: build/*.txz
           if-no-files-found: error
           retention-days: 1
 
-  validate:
+  release:
     needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/download-artifact@v3
         with:
           path: build/
-      - name: 📦 What's in the box?
-        run: |
-          shopt -s nullglob globstar
-          ls -lhar build/
-          file build/**
+
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: build/release/*.txz
+          generate_release_notes: true
