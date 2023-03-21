@@ -10,7 +10,7 @@ import (
 
 	flag "github.com/spf13/pflag"
 
-	"github.com/keilerkonzept/dockerfile-json/pkg/dockerfile"
+	"github.com/mckern/dockerfile-json/pkg/dockerfile"
 )
 
 var config struct {
