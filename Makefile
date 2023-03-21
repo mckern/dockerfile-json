@@ -1,80 +1,61 @@
-VERSION := $(shell jq -r .version <package.json)
 
-APP      := $(shell jq -r .name <package.json)
-PACKAGES := $(shell go list -f {{.Dir}} ./...)
-GOFILES  := $(addsuffix /*.go,$(PACKAGES))
-GOFILES  := $(wildcard $(GOFILES))
 
-.PHONY: clean release binaries README.md
+SHELL := /bin/bash
+
+NAME = dockerfile-json
+BUILD_DIR ?= build
+
+GO := $(shell command -v go)
+GIT := $(shell command -v git)
+TAR := $(shell command -v tar)
+
+GOARCH ?= $(shell $(GO) env GOARCH)
+GOOS ?= $(shell $(GO) env GOOS)
+VERSION := $(shell $(GIT) describe --always --tags --dirty --first-parent)
+
+LDFLAGS := -s -w -X main.version=$(VERSION)
+
+BUILD_NAME ?= $(NAME)_$(GOOS)_$(GOARCH)
+BIN_NAME := $(BUILD_DIR)/$(BUILD_NAME)
+
+ARCHIVE_EXT := txz
+ARCHIVE_FLAGS := cJvf
+
+ARCHIVE_NAME := $(BUILD_NAME)-$(VERSION).$(ARCHIVE_EXT)
+ARCHIVE_TARGET ?=  $(BUILD_DIR)/$(ARCHIVE_NAME)
+
+# ensure that compilation doesn't link against libc
+export CGO_ENABLED := 0
+
+.DEFAULT_TARGET := $(BIN_NAME)
+.PHONY: build compress test
+
+$(BIN_NAME):
+	$(GO) build \
+		-a \
+		-ldflags "$(LDFLAGS)" \
+		-o $(BIN_NAME) \
+		-trimpath \
+		./
+
+build: $(BIN_NAME)
+
+compress: $(ARCHIVE_TARGET)
+
+$(ARCHIVE_TARGET): $(BIN_NAME)
+	$(TAR) -$(ARCHIVE_FLAGS) $(ARCHIVE_TARGET) -C $(BUILD_DIR) $(BUILD_NAME)
+
+test:
+	$(GO) test -v ./...
 
 clean:
-	rm -rf binaries/
-	rm -rf release/
+	@$(RM) -v $(BIN_NAME) $(ARCHIVE_TARGET)
 
-release: README.md zip
-	git add README.template.md
-	git add README.md
-	git add Makefile
-	git commit -am "Release $(VERSION)" || true
-	git push
-	hub release create $(VERSION) -m "$(VERSION)" -a release/$(APP)_$(VERSION)_darwin_amd64.tar.gz -a release/$(APP)_$(VERSION)_windows_amd64.zip -a release/$(APP)_$(VERSION)_linux_amd64.tar.gz -a release/$(APP)_$(VERSION)_windows_x86_32.zip -a release/$(APP)_$(VERSION)_linux_x86_32.tar.gz -a release/$(APP)_$(VERSION)_linux_arm64.tar.gz
+cleaner: clean
+	@$(RM) -rv $(BUILD_DIR)
+	@$(GO) clean -cache -modcache
 
-README.md:
-	go get github.com/keilerkonzept/$(APP) && <README.template.md subst \
-		EXAMPLE_6="$$($(APP)  --expand-build-args=false --jsonpath=$$..BaseName examples/Dockerfile.3 | jq .)" \
-		EXAMPLE_5="$$($(APP) --jsonpath=$$..BaseName examples/Dockerfile.3 | jq .)" \
-		EXAMPLE_4="$$($(APP) --jsonpath=$$..Image --build-arg ALPINE_TAG=hello-world examples/Dockerfile.3 | jq .)" \
-		EXAMPLE_3B="$$($(APP) --jsonpath=$$..Image --jsonpath-raw examples/Dockerfile.3)" \
-		EXAMPLE_3A="$$($(APP) --jsonpath=$$..Image examples/Dockerfile.3 | jq .)" \
-		EXAMPLE_2="$$($(APP) --jsonpath=$$..As examples/Dockerfile.2 | jq .)" \
-		EXAMPLE_1="$$($(APP) examples/Dockerfile.1 | jq .)" \
-		VERSION="$(VERSION)" APP="$(APP)" USAGE="$$($(APP) -h 2>&1)" > README.md
+cleanest: cleaner
+	@$(GIT) clean -fdx
 
-zip: release/$(APP)_$(VERSION)_darwin_amd64.tar.gz release/$(APP)_$(VERSION)_windows_amd64.zip release/$(APP)_$(VERSION)_linux_amd64.tar.gz release/$(APP)_$(VERSION)_windows_x86_32.zip release/$(APP)_$(VERSION)_linux_x86_32.tar.gz release/$(APP)_$(VERSION)_linux_arm64.tar.gz
-
-binaries: binaries/darwin_amd64/$(APP) binaries/windows_amd64/$(APP).exe binaries/linux_amd64/$(APP) binaries/windows_x86_32/$(APP).exe binaries/linux_x86_32/$(APP)
-
-release/$(APP)_$(VERSION)_darwin_amd64.tar.gz: binaries/darwin_amd64/$(APP)
-	mkdir -p release
-	tar cfz release/$(APP)_$(VERSION)_darwin_amd64.tar.gz -C binaries/darwin_amd64 $(APP)
-
-binaries/darwin_amd64/$(APP): $(GOFILES)
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/darwin_amd64/$(APP) .
-
-binaries/darwin_arm64/$(APP): $(GOFILES)
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/darwin_arm64/$(APP) .
-
-release/$(APP)_$(VERSION)_windows_amd64.zip: binaries/windows_amd64/$(APP).exe
-	mkdir -p release
-	cd ./binaries/windows_amd64 && zip -r -D ../../release/$(APP)_$(VERSION)_windows_amd64.zip $(APP).exe
-
-binaries/windows_amd64/$(APP).exe: $(GOFILES)
-	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/windows_amd64/$(APP).exe .
-
-release/$(APP)_$(VERSION)_linux_amd64.tar.gz: binaries/linux_amd64/$(APP)
-	mkdir -p release
-	tar cfz release/$(APP)_$(VERSION)_linux_amd64.tar.gz -C binaries/linux_amd64 $(APP)
-
-binaries/linux_amd64/$(APP): $(GOFILES)
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/linux_amd64/$(APP) .
-
-release/$(APP)_$(VERSION)_windows_x86_32.zip: binaries/windows_x86_32/$(APP).exe
-	mkdir -p release
-	cd ./binaries/windows_x86_32 && zip -r -D ../../release/$(APP)_$(VERSION)_windows_x86_32.zip $(APP).exe
-
-binaries/windows_x86_32/$(APP).exe: $(GOFILES)
-	GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/windows_x86_32/$(APP).exe .
-
-release/$(APP)_$(VERSION)_linux_x86_32.tar.gz: binaries/linux_x86_32/$(APP)
-	mkdir -p release
-	tar cfz release/$(APP)_$(VERSION)_linux_x86_32.tar.gz -C binaries/linux_x86_32 $(APP)
-
-binaries/linux_x86_32/$(APP): $(GOFILES)
-	GOOS=linux GOARCH=386 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/linux_x86_32/$(APP) .
-
-release/$(APP)_$(VERSION)_linux_arm64.tar.gz: binaries/linux_arm64/$(APP)
-	mkdir -p release
-	tar cfz release/$(APP)_$(VERSION)_linux_arm64.tar.gz -C binaries/linux_arm64 $(APP)
-
-binaries/linux_arm64/$(APP): $(GOFILES)
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o binaries/linux_arm64/$(APP) .
+rebuild: clean build

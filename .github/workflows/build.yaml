@@ -5,6 +5,14 @@ on:
   pull_request:
 jobs:
   build:
+    strategy:
+      matrix:
+        arch:
+          - amd64
+          - arm64
+        os:
+          - darwin
+          - linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -15,4 +23,7 @@ jobs:
           go-version: "1.20"
 
       - name: Build
-        run: make binaries
+        env:
+          GOOS: "${{matrix.os}}"
+          GOARCH: "${{matrix.arch}}"
+        run: make compress
